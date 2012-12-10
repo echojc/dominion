@@ -2,8 +2,10 @@ package sh.echo.dominion.model.cards
 
 import sh.echo.dominion.model.Game
 
-sealed abstract class Card() {
-  def play {}
+abstract class Card() {
+  val get: Card = this
+  
+  def play() {}
   val isPlayable = false
   
   val count: Int
@@ -12,19 +14,25 @@ sealed abstract class Card() {
   val description: String = ""
 }
 
-abstract case class Action(name: String, cost: Int, override val description: String) extends Card {
+abstract class Action(val name: String, val cost: Int, override val description: String) extends Card {
   override val isPlayable = true
   override val count = 10
 }
+trait Attack {
+  def attack()
+}
+trait Reaction {
+  def react(card: Card with Attack)
+}
 
-abstract case class Treasure(name: String, cost: Int, value: Int) extends Card {
+abstract class Treasure(val name: String, val cost: Int, val value: Int) extends Card {
   override val isPlayable = true
   override def play {
     Game.treasureCount += value
   }
 }
 
-abstract case class Victory(name: String, cost: Int, override val description: String = "") extends Card {
+abstract class Victory(val name: String, val cost: Int) extends Card {
   def value: Int
   override val count = {
     val playerCount = Game.players.size
@@ -33,10 +41,6 @@ abstract case class Victory(name: String, cost: Int, override val description: S
   }
 }
 
-abstract case class Curse(name: String, cost: Int, value: Int) extends Card {
+abstract class Curse(val name: String, val cost: Int, val value: Int) extends Card {
   override val count = (Game.players.size - 1) * 10
-}
-
-abstract class Set {
-  val all: List[Card]
 }

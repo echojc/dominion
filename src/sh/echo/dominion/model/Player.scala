@@ -9,11 +9,19 @@ class Player {
   var discard: List[Card] = Nil
   
   def drawToHand(count: Int) {
-    if (count == 0) return
-    if (deck == Nil) shuffleDiscardIntoDeck
-    hand ::= deck.head
-    deck = deck.tail
-    drawToHand(count - 1)
+    addToHand(takeFromDeck(count))
+  }
+  
+  def addToHand(cards: List[Card]) {
+    hand :::= cards
+  }
+  
+  def addToDiscard(cards: List[Card]) {
+    discard :::= cards
+  }
+  
+  def addToDeck(cards: List[Card]) {
+    deck :::= cards
   }
   
   def discardHand() {
@@ -21,9 +29,17 @@ class Player {
     hand = Nil
   }
   
-  def shuffleDiscardIntoDeck {
+  def shuffleDiscardIntoDeck() {
     deck ++= discard
     discard = Nil
     deck = Random.shuffle(deck)
+  }
+  
+  def takeFromDeck(count: Int): List[Card] = {
+    if (count == 0) Nil
+    if (deck == Nil) shuffleDiscardIntoDeck()
+    val card = deck.head
+    deck = deck.tail
+    card :: takeFromDeck(count - 1)
   }
 }
