@@ -39,9 +39,11 @@ class Player {
   
   def takeFromDeck(count: Int): List[Card] = {
     if (count == 0) Nil
-    if (deck == Nil) shuffleDiscardIntoDeck()
-    val card = deck.head
-    deck = deck.tail
-    card :: takeFromDeck(count - 1)
+    else {
+      if (deck == Nil) shuffleDiscardIntoDeck()
+      val card = deck.head
+      deck = deck.tail
+      card :: takeFromDeck(count - 1)
+    }
   }
 }
