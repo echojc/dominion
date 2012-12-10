@@ -2,10 +2,12 @@ package sh.echo.dominion.model
 
 import sh.echo.dominion.model.cards.Card
 import scala.util.Random
+import sh.echo.dominion.model.cards.special.Copper;
+import sh.echo.dominion.model.cards.special.Estate;
 
 class Player {
-  var deck: List[Card] = Nil
-  var hand: List[Card] = Nil
+  var deck: List[Card] = Random.shuffle(List(Estate, Estate, Estate, Copper, Copper, Copper, Copper, Copper, Copper, Copper))
+  var hand: List[Card] = takeFromDeck(5)
   var discard: List[Card] = Nil
   
   def drawToHand(count: Int) {

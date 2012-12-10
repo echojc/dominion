@@ -31,9 +31,11 @@ object Game {
   def endTurn() {
     if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.");
     
-    currentPlayer.discardHand
+    currentPlayer.discardHand()
     currentPlayer.discard ++= playedCards
     playedCards = Nil
+    
+    currentPlayer.drawToHand(5);
   }
   
   def play(card: Card) {
