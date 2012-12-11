@@ -5,7 +5,7 @@ import scala.util.Random
 import sh.echo.dominion.model.cards.special.Copper;
 import sh.echo.dominion.model.cards.special.Estate;
 
-class Player {
+class Player(val name: String) {
   var deck: List[Card] = Random.shuffle(List(Estate, Estate, Estate, Copper, Copper, Copper, Copper, Copper, Copper, Copper))
   var hand: List[Card] = takeFromDeck(5)
   var discard: List[Card] = Nil

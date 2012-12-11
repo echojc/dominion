@@ -5,40 +5,41 @@ import scala.util.Random
 import scala.collection.JavaConversions._
 import scala.collection.mutable.Map
 
-object Game {
-
-  var actionCount = 1
-  var buyCount = 1
-  var treasureCount = 0
+object Game extends Controller {
+  def get() = this
   
-  def currentPlayer = players(currentPlayerIndex)
-  var players: List[Player] = Nil
-  var currentPlayerIndex = 0
+  def createGame() {
+    players = Nil
+    playedCards = Nil
+    revealedCards = Nil
+    trash = Nil
+  }
   
-  var playedCards: List[Card] = Nil
-  var revealedCards: List[Card] = Nil
-  var trash: List[Card] = Nil
+  def addPlayer(name: String, v: View): Player = {
+    val player = new Player(name)
+    players ::= player
+    playerViews += player -> v
+    player
+  }
   
-  var supply: Map[Card, Int] = Map()
-  def availableSupply = supply.filter { _._2 > 0 }
+  def startGame(p: Player) {
+    Random.shuffle(players)
+    
+    prepareSupply()
+    fireEvent(_.gameStarted(p, players, supply.keys.toList))
+    
+    currentPlayerIndex = 0
+    fireEvent(_.nextPlayer(currentPlayer))
+  }
   
-  def startTurn() {
+  def startTurn(p: Player) {
     actionCount = 1
     buyCount = 1
     treasureCount = 0
+    fireEvent(_.turnStarted(p))
   }
   
-  def endTurn() {
-    if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.");
-    
-    currentPlayer.discardHand()
-    currentPlayer.discard ++= playedCards
-    playedCards = Nil
-    
-    currentPlayer.drawToHand(5);
-  }
-  
-  def play(card: Card) {
+  def play(p: Player, card: Card) {
     if (!card.isPlayable) throw new IllegalArgumentException("Tried to play unplayable card.")
     if (!currentPlayer.hand.contains(card)) throw new IllegalArgumentException("Tried to play non-existent card.")
     if (card.isInstanceOf[Action]) {
@@ -48,10 +49,41 @@ object Game {
     currentPlayer.hand = currentPlayer.hand diff List(card)
     playedCards ::= card
     card.play()
+    fireEvent(_.cardPlayed(p, card))
   }
+  
+  def endTurn(p: Player) {
+    if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.");
+    
+    currentPlayer.discardHand()
+    currentPlayer.discard ++= playedCards
+    playedCards = Nil
+    
+    currentPlayer.drawToHand(5);
+    fireEvent(_.turnEnded(p))
+    
+    nextPlayer()
+  }
+
+  var actionCount = 1
+  var buyCount = 1
+  var treasureCount = 0
+  
+  def currentPlayer = players(currentPlayerIndex)
+  var players: List[Player] = Nil
+  var playerViews: Map[Player, View] = Map()
+  var currentPlayerIndex = 0
+  
+  var playedCards: List[Card] = Nil
+  var revealedCards: List[Card] = Nil
+  var trash: List[Card] = Nil
+  
+  var supply: Map[Card, Int] = Map()
+  def availableSupply = supply.filter { _._2 > 0 }
   
   def nextPlayer() {
     currentPlayerIndex = (currentPlayerIndex + 1) % players.size
+    fireEvent(_.nextPlayer(currentPlayer))
   }
   
   def reveal(card: Card) {
@@ -112,32 +144,18 @@ object Game {
     Random.shuffle(CardLists.Base).take(10).foreach(addToSupply)
   }
   
-  def createGame {
-    players = Nil
-    currentPlayerIndex = 0
+//  def supplyCount(card: Card): Int = {
+//    supply(card)
+//  }
+//  
+//  def sortedKingdomSupply(): java.util.List[Card] = {
+//    supply.filterNot(c => CardLists.Special.contains(c._1)).keys.toList.sortWith((a, b) => {
+//      if (a.cost != b.cost) a.cost < b.cost
+//      else a.name < b.name
+//    })
+//  }
   
-    playedCards = Nil
-    revealedCards = Nil
-    trash = Nil
-  }
-  
-  def addPlayer() {
-    players ::= new Player()
-  }
-  
-  def startGame {
-    Random.shuffle(players)
-    prepareSupply()
-  }
-  
-  def supplyCount(card: Card): Int = {
-    supply(card)
-  }
-  
-  def sortedKingdomSupply(): java.util.List[Card] = {
-    supply.filterNot(c => CardLists.Special.contains(c._1)).keys.toList.sortWith((a, b) => {
-      if (a.cost != b.cost) a.cost < b.cost
-      else a.name < b.name
-    })
+  def fireEvent(e: View => Unit) {
+    playerViews.values.foreach(e)
   }
 }
