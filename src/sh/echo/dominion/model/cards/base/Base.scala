@@ -12,28 +12,28 @@ object Adventurer extends Action("Adventurer", 6, "Reveal cards from your deck u
   override def play() {
     val cardsToTake = 2 min (currentPlayer.deck ++ currentPlayer.discard).count { _.isInstanceOf[Treasure] }
     
-    while (revealedCards.count { _.isInstanceOf[Treasure] } < cardsToTake) {
+    while (revealedCards.count(_.isInstanceOf[Treasure]) < cardsToTake) {
       val card = currentPlayer.takeFromDeck(1)(0)
       reveal(card)
     }
-    currentPlayer.addToHand(revealedCards.filter { _.isInstanceOf[Treasure] })
-    currentPlayer.addToDiscard(revealedCards.filter { !_.isInstanceOf[Treasure] })
-    revealedCards = Nil
+    currentPlayer.addToHand(revealedCards.filter(_.isInstanceOf[Treasure]))
+    currentPlayer.addToDiscard(revealedCards.filterNot(_.isInstanceOf[Treasure]))
+    revealClear();
   }
 }
 
 object Bureaucrat extends Action("Bureaucrat", 4, "Gain a Silver card; put it on top of your deck. Each other player reveals a Victory card from his hand and puts it on his deck (or reveals a hand with no Victory cards).") with Attack {
   override def play() {
-    gain(Silver, currentPlayer.deck)
+    gainToDeck(Silver)
   }
   def attack() {
     cyclePlayers(_ => {
-      if (currentPlayer.hand.exists { _.isInstanceOf[Victory] }) {
-        val card = select(currentPlayer.hand.filter { _.isInstanceOf[Victory] }, 1)(0)
-        card :: currentPlayer.deck
+      if (currentPlayer.hand.exists(_.isInstanceOf[Victory])) {
+        val card = selectFromHand(_.isInstanceOf[Victory], 1, true)
+        currentPlayer.addToDeck(card)
       } else {
         reveal(currentPlayer.hand)
-        revealedCards = Nil
+        revealClear()
       }
     })
   }
@@ -41,9 +41,8 @@ object Bureaucrat extends Action("Bureaucrat", 4, "Gain a Silver card; put it on
 
 object Cellar extends Action("Cellar", 2, "+1 Action. Discard any number of cards. +1 Card per card discarded.") {
   override def play() {
-    actionCount += 1
-    val cards = select(currentPlayer.hand)
-    currentPlayer.hand = currentPlayer.hand diff cards
+    updateAction(1)
+    val cards = selectFromHand()
     currentPlayer.addToDiscard(cards)
     currentPlayer.drawToHand(cards.size)
   }
@@ -51,18 +50,17 @@ object Cellar extends Action("Cellar", 2, "+1 Action. Discard any number of card
 
 object Chancellor extends Action("Chancellor", 3, "+$2. You may immediately put your deck into your discard pile.") {
   override def play() {
-    treasureCount += 2
+    updateTreasure(2)
     if (ask("Put deck into discard pile?")) {
-      currentPlayer.addToDiscard(currentPlayer.deck)
-      currentPlayer.deck = Nil
+      val deck = currentPlayer.takeFromDeck(currentPlayer.deck.size)
+      currentPlayer.addToDiscard(deck)
     }
   }
 }
 
 object Chapel extends Action("Chapel", 2, "Trash up to 4 cards from your hand.") {
   override def play() {
-    val cards = select(currentPlayer.hand, 4)
-    currentPlayer.hand = currentPlayer.hand diff cards
+    val cards = selectFromHand(max = 4)
     trash(cards)
   }
 }
@@ -70,7 +68,7 @@ object Chapel extends Action("Chapel", 2, "Trash up to 4 cards from your hand.")
 object CouncilRoom extends Action("Council Room", 5, "+4 Cards, +1 Buy. Each other player draws a card.") {
   override def play() {
     currentPlayer.drawToHand(4)
-    buyCount += 1
+    updateBuy(1)
     cyclePlayers(_ => {
       currentPlayer.drawToHand(1)
     })
@@ -83,17 +81,15 @@ object Feast extends Action("Feast", 4, "Trash this card. Gain a card costing up
       playedCards = playedCards.tail
       trash(Feast)
     }
-    val cards = availableSupply.keys.toList.filter { _.cost <= 5 }
-    val card = select(cards, 1)(0)
-    gain(card)
+    selectAndGainFromSupply(_.cost <= 5)
   }
 }
 
 object Festival extends Action("Festival", 5, "+2 Actions, +1 Buy, +$2.") {
   override def play() {
-    actionCount += 2
-    buyCount += 1
-    treasureCount += 2
+    updateAction(2)
+    updateBuy(1)
+    updateTreasure(2)
   }
 }
 
@@ -105,41 +101,41 @@ object Gardens extends Victory("Gardens", 4) {
 object Laboratory extends Action("Laboratory", 5, "+2 Cards, +1 Action.") {
   override def play() {
     currentPlayer.drawToHand(2)
-    actionCount += 1
+    updateAction(1)
   }
 }
 
 object Library extends Action("Library", 5, "Draw until you have 7 cards in hand. You may set aside any Action cards drawn this way, as you draw them; discard the set aside cards after you finish drawing.") {
   override def play() {
-    var setAside: List[Card] = Nil
     while (currentPlayer.hand.size < 7 && (currentPlayer.deck.size + currentPlayer.discard.size) > 0) {
       val card = currentPlayer.takeFromDeck(1)(0)
       val setAsideCard = card.isInstanceOf[Action] && ask("Set this aside?")
-      if (setAsideCard) setAside ::= card
+      if (setAsideCard) reveal(card)
       else currentPlayer.addToHand(List(card))
     }
-    currentPlayer.addToDiscard(setAside)
+    currentPlayer.addToDiscard(revealedCards)
+    revealClear()
   }
 }
 
 object Market extends Action("Market", 5, "+1 Card, +1 Action, +1 Buy, +$1.") {
   override def play() {
     currentPlayer.drawToHand(1)
-    actionCount += 1
-    buyCount += 1
-    treasureCount += 1
+    updateAction(1)
+    updateBuy(1)
+    updateTreasure(1)
   }
 }
 
 object Militia extends Action("Militia", 4, "+$2. Each other player discards down to 3 cards in his hand.") with Attack {
   override def play() {
-    treasureCount += 2
+    updateTreasure(2)
   }
   def attack() {
     cyclePlayers(_ => {
       if (currentPlayer.hand.size > 3) {
-        val cards = select(currentPlayer.hand, 3)
-        currentPlayer.hand = cards
+        val cards = selectFromHand(max = currentPlayer.hand.size - 3, exact = true)
+        currentPlayer.addToDiscard(cards)
       }
     })
   }
@@ -147,12 +143,10 @@ object Militia extends Action("Militia", 4, "+$2. Each other player discards dow
 
 object Mine extends Action("Mine", 5, "Trash a Treasure card from your hand. Gain a Treasure card costing up to $3 more; put it into your hand.") {
   override def play() {
-    if (currentPlayer.hand.exists { _.isInstanceOf[Treasure] }) {
-      val card = select(currentPlayer.hand.filter { _.isInstanceOf[Treasure] }, 1)(0)
-      currentPlayer.hand = currentPlayer.hand diff List(card)
+    if (currentPlayer.hand.exists(_.isInstanceOf[Treasure])) {
+      val card = selectFromHand(_.isInstanceOf[Treasure], 1)(0)
       trash(card)
-      val cardToGain = select(availableSupply.keys.toList.filter { c => c.isInstanceOf[Treasure] && c.cost <= card.cost + 3 }, 1)(0)
-      gain(cardToGain)
+      selectAndGainFromSupply(c => c.isInstanceOf[Treasure] && c.cost <= card.cost + 3)
     }
   }
 }
@@ -167,9 +161,9 @@ object Moat extends Action("Moat", 2, "+2 Cards. When another player plays an At
 object Moneylender extends Action("Moneylender", 4, "Trash a Copper card from your hand. If you do, +$3.") {
   override def play() {
     if (currentPlayer.hand.contains(Copper)) {
-      currentPlayer.hand diff List(Copper)
+      selectFromHand(_ == Copper, 1, true, true)
       trash(Copper)
-      treasureCount += 3
+      updateTreasure(3)
     }
   }
 }
@@ -177,11 +171,9 @@ object Moneylender extends Action("Moneylender", 4, "Trash a Copper card from yo
 object Remodel extends Action("Remodel", 4, "Trash a card from your hand. Gain a card costing up to $2 more than the trashed card.") {
   override def play() {
     if (currentPlayer.hand != Nil) {
-      val card = select(currentPlayer.hand, 1)(0)
-      currentPlayer.hand diff List(card)
+      val card = selectFromHand(max = 1, exact = true)(0)
       trash(card)
-      val cardToGain = select(availableSupply.keys.toList.filter { _.cost <= card.cost + 2 }, 1)(0)
-      gain(cardToGain)
+      selectAndGainFromSupply(_.cost <= card.cost + 2)
     }
   }
 }
@@ -195,7 +187,7 @@ object Smithy extends Action("Smithy", 4, "+3 Cards.") {
 object Spy extends Action("Spy", 4, "+1 Card, +1 Action. Each player (including you) reveals the top card of his deck and either discards it or puts it back, your choice.") with Attack {
   override def play() {
     currentPlayer.drawToHand(1)
-    actionCount += 1
+    updateAction(1)
   }
   def attack() {
     cyclePlayers(origPlayerIndex => {
@@ -206,7 +198,7 @@ object Spy extends Action("Spy", 4, "+1 Card, +1 Action. Each player (including 
       } else {
         currentPlayer.addToDeck(card)
       }
-      revealedCards = Nil
+      revealClear()
     })
   }
 }
@@ -218,20 +210,21 @@ object Thief extends Action("Thief", 4, "Each other player reveals the top 2 car
     cyclePlayers(origPlayerIndex => {
       val cards = currentPlayer.takeFromDeck(2)
       reveal(cards)
-      val count = revealedCards.count { _.isInstanceOf[Treasure] }
+      val count = revealedCards.count(_.isInstanceOf[Treasure])
       if (count > 0) {
         val card = (
-          if (count == 1) revealedCards.filter { _.isInstanceOf[Treasure] }
-          else select(revealedCards, 1)
+          if (count == 1) revealedCards.filter(_.isInstanceOf[Treasure])
+          else selectFromList(revealedCards, 1, true)
         )(0)
         trashedCards ::= card
         revealedCards diff List(card)
         trash(card)
       }
       currentPlayer.addToDiscard(revealedCards)
+      revealClear()
     })
     if (trashedCards != Nil) {
-      val cardsToGain = select(trashedCards)
+      val cardsToGain = selectFromList(trashedCards)
       gain(cardsToGain)
     }
   }
@@ -240,7 +233,7 @@ object Thief extends Action("Thief", 4, "Each other player reveals the top 2 car
 object ThroneRoom extends Action("Throne Room", 4, "Choose an Action card in your hand. Play it twice.") {
   override def play() {
     if (currentPlayer.hand.count { _.isInstanceOf[Action] } > 0) {
-      val card = select(currentPlayer.hand.filter { _.isInstanceOf[Action] }, 1)(0)
+      val card = selectFromHand(_.isInstanceOf[Action], 1, true)(0)
       Game.play(currentPlayer, card)
       card.play()
     }
@@ -250,7 +243,7 @@ object ThroneRoom extends Action("Throne Room", 4, "Choose an Action card in you
 object Village extends Action("Village", 3, "+1 Cards, +2 Action.") {
   override def play() {
     currentPlayer.drawToHand(1)
-    actionCount += 2
+    updateAction(2)
   }
 }
 
@@ -267,14 +260,13 @@ object Witch extends Action("Witch", 5, "+2 Cards. Each other player gains a Cur
 
 object Woodcutter extends Action("Woodcutter", 3, "+1 Buy, +$2.") {
   override def play() {
-    buyCount += 1
-    treasureCount += 2
+    updateBuy(1)
+    updateTreasure(2)
   }
 }
 
 object Workshop extends Action("Workshop", 3, "Gain a card costing up to $4.") {
   override def play() {
-    val card = select(availableSupply.keys.toList.filter { _.cost <= 4 }, 1)(0)
-    gain(card)
+    selectAndGainFromSupply(_.cost <= 4)
   }
 }
