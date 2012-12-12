@@ -234,7 +234,7 @@ object ThroneRoom extends Action("Throne Room", 4, "Choose an Action card in you
   override def play() {
     if (currentPlayer.hand.count { _.isInstanceOf[Action] } > 0) {
       val card = selectFromHand(_.isInstanceOf[Action], 1, true)(0)
-      Game.play(currentPlayer, card)
+      Game.play(currentPlayer.name, card)
       card.play()
     }
   }

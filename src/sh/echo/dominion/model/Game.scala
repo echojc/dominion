@@ -15,25 +15,25 @@ object Game extends Controller {
     trash = Nil
   }
   
-  def addPlayer(name: String, v: View): Player = {
+  def addPlayer(name: String, v: View): String = {
     val player = new Player(name)
     players ::= player
-    playerViews += player -> v
-    player
+    playerViews += player -> new ViewActor(v)
+    name
   }
   
-  def startGame(p: Player) {
+  def startGame(p: String) {
     Random.shuffle(players)
     
     supply = Map()
     (CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).foreach(c => supply(c) = c.count)
-    fireEvent(_.gameStarted(p, players, supply.keys.toList))
+    fireEvent(_.gameStarted(p, players.map(_.name), supply.keys.toList))
     
     currentPlayerIndex = 0
-    fireEvent(_.nextPlayer(currentPlayer))
+    fireEvent(_.nextPlayer(currentPlayer.name))
   }
   
-  def startTurn(p: Player) {
+  def startTurn(p: String) {
     actionCount = 1
     buyCount = 1
     treasureCount = 0
@@ -41,20 +41,21 @@ object Game extends Controller {
     fireEvent(_.turnStarted(p))
   }
   
-  def play(p: Player, card: Card) {
+  def play(p: String, card: Card) {
     if (!card.isPlayable) throw new IllegalArgumentException("Tried to play unplayable card.")
     if (!currentPlayer.hand.contains(card)) throw new IllegalArgumentException("Tried to play non-existent card.")
     if (card.isInstanceOf[Action]) {
       if (actionCount == 0) throw new IllegalArgumentException("No more actions!")
       updateAction(-1)
     }
+    
     currentPlayer.hand = currentPlayer.hand diff List(card)
     playedCards ::= card
     card.play()
     fireEvent(_.cardPlayed(p, card))
   }
   
-  def endTurn(p: Player) {
+  def endTurn(p: String) {
     if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.");
     
     currentPlayer.discardHand()
@@ -74,7 +75,7 @@ object Game extends Controller {
   
   def currentPlayer = players(currentPlayerIndex)
   var players: List[Player] = Nil
-  var playerViews: Map[Player, View] = Map()
+  var playerViews: Map[Player, ViewActor] = Map()
   var currentPlayerIndex = 0
   
   var playedCards: List[Card] = Nil
@@ -86,7 +87,7 @@ object Game extends Controller {
   
   def nextPlayer() {
     currentPlayerIndex = (currentPlayerIndex + 1) % players.size
-    fireEvent(_.nextPlayer(currentPlayer))
+    fireEvent(_.nextPlayer(currentPlayer.name))
   }
   
   def reveal(card: Card) {
@@ -111,7 +112,7 @@ object Game extends Controller {
     if (supply(card) > 0) {
       supply(card) -= 1
       currentPlayer.addToDiscard(List(card))
-      fireEvent(_.cardGained(currentPlayer, card))
+      fireEvent(_.cardGained(currentPlayer.name, card))
     }
   }
   
@@ -119,7 +120,7 @@ object Game extends Controller {
     if (supply(card) > 0) {
       supply(card) -= 1
       currentPlayer.addToDeck(List(card))
-      fireEvent(_.cardGainedToDeck(currentPlayer, card))
+      fireEvent(_.cardGainedToDeck(currentPlayer.name, card))
     }
   }
   
@@ -131,23 +132,24 @@ object Game extends Controller {
         if (max == -1) cards
         else cards.take(max)
     } else {
-      fireEvent(_.waitingFor(currentPlayer))
-      selected = fireEventForResult(currentPlayer, _.selectFromHand(cards, max, exact))
-      fireEvent(_.waitedFor(currentPlayer))
+      fireEvent(_.waitingFor(currentPlayer.name))
+      selected = fireEventForResult(currentPlayer, _.selectFromHand(cards, max, exact)).toList
+      fireEvent(_.waitedFor(currentPlayer.name))
     }
     if ((exact && selected.size != max) || (!exact && max != -1 && selected.size > max)) 
       throw new IllegalStateException("Incorrect number of cards received.")
     if (!(selected diff cards).isEmpty)
       throw new IllegalStateException("Invalid cards received.")
     currentPlayer.hand = currentPlayer.hand diff selected
-    fireEvent(_.selectedFromHand(currentPlayer, selected.size))
+    fireEvent(_.selectedFromHand(currentPlayer.name, selected.size))
     selected
   }
   
   def selectFromList(cards: List[Card], max: Int = -1, exact: Boolean = false): List[Card] = {
-    fireEvent(_.waitingFor(currentPlayer))
-    val selected = fireEventForResult(currentPlayer, _.selectFromList(cards, max, exact))
-    fireEvent(_.waitedFor(currentPlayer))
+    fireEvent(_.waitingFor(currentPlayer.name))
+    val selected = fireEventForResult(currentPlayer, _.selectFromList(cards, max, exact)).toList
+    fireEvent(_.waitedFor(currentPlayer.name))
+    
     if ((exact && selected.size != max) || (!exact && max != -1 && selected.size > max)) 
       throw new IllegalStateException("Incorrect number of cards received.")
     if (!(selected diff cards).isEmpty)
@@ -156,9 +158,10 @@ object Game extends Controller {
   }
   
   def selectAndGainFromSupply(filter: Card => Boolean = _ => true) {
-    fireEvent(_.waitingFor(currentPlayer))
+    fireEvent(_.waitingFor(currentPlayer.name))
     val selected = fireEventForResult(currentPlayer, _.selectFromSupplyForGain(supply.keys.filter(filter).toList))
-    fireEvent(_.waitedFor(currentPlayer))
+    fireEvent(_.waitedFor(currentPlayer.name))
+    
     if (!filter(selected) || supply(selected) == 0)
       throw new IllegalStateException("Invalid card selected from supply for gain.")
     gain(selected)
@@ -166,9 +169,9 @@ object Game extends Controller {
   
   def ask(msg: String, playerIndex: Int = currentPlayerIndex) : Boolean = {
     val player = players(playerIndex)
-    fireEvent(_.waitingFor(player))
+    fireEvent(_.waitingFor(player.name))
     val reply = fireEventForResult(player, _.ask(msg))
-    fireEvent(_.waitedFor(player))
+    fireEvent(_.waitedFor(player.name))
     reply
   }
   
@@ -206,10 +209,10 @@ object Game extends Controller {
   }
   
   def fireEvent(event: View => Unit) {
-    playerViews.values.foreach(event)
+    playerViews.values.foreach(_ ! event)
   }
   
   def fireEventForResult[T](p: Player, event: View => T): T = {
-    event(playerViews(p))
+    (playerViews(p) !? event).asInstanceOf[T]
   }
 }

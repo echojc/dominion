@@ -4,6 +4,7 @@ import sh.echo.dominion.model.cards.Card
 import scala.util.Random
 import sh.echo.dominion.model.cards.special.Copper;
 import sh.echo.dominion.model.cards.special.Estate;
+import scala.collection.JavaConversions._
 
 class Player(val name: String) {
   import Game._
@@ -18,30 +19,30 @@ class Player(val name: String) {
   
   def addToHand(cards: List[Card]) {
     hand :::= cards
-    fireEvent(_.addedToHand(currentPlayer, cards.size))
+    fireEvent(_.addedToHand(name, cards))
   }
   
   def addToDiscard(cards: List[Card]) {
     discard :::= cards
-    fireEvent(_.addedToDiscard(currentPlayer, cards))
+    fireEvent(_.addedToDiscard(name, cards))
   }
   
   def addToDeck(cards: List[Card]) {
     deck :::= cards
-    fireEvent(_.addedToDeck(currentPlayer, cards.size))
+    fireEvent(_.addedToDeck(name, cards))
   }
   
   def discardHand() {
     discard ++= hand
     hand = Nil
-    fireEvent(_.discardedHand(currentPlayer, discard.size))
+    fireEvent(_.discardedHand(name, discard.size))
   }
   
   def shuffleDiscardIntoDeck() {
     deck ++= discard
     discard = Nil
     deck = Random.shuffle(deck)
-    fireEvent(_.shuffledDiscardIntoDeck(currentPlayer, deck.size))
+    fireEvent(_.shuffledDiscardIntoDeck(name, deck.size))
   }
   
   def takeFromDeck(count: Int): List[Card] = {
@@ -51,7 +52,7 @@ class Player(val name: String) {
       if (deck == Nil) Nil
       val card = deck.head
       deck = deck.tail
-      fireEvent(_.drewCardFromDeck(currentPlayer))
+      fireEvent(_.tookCardFromDeck(name))
       card :: takeFromDeck(count - 1)
     }
   }
