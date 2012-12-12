@@ -18,7 +18,9 @@ object Game extends Controller {
   def addPlayer(name: String, v: View): String = {
     val player = new Player(name)
     players ::= player
-    playerViews += player -> new ViewActor(v)
+    val actor = new ViewActor(v)
+    playerViews += player -> actor
+    actor.start()
     name
   }
   
