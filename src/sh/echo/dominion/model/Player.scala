@@ -9,9 +9,14 @@ import scala.collection.JavaConversions._
 class Player(val name: String) {
   import Game._
   
-  var deck: List[Card] = Random.shuffle(List(Estate, Estate, Estate, Copper, Copper, Copper, Copper, Copper, Copper, Copper))
-  var hand: List[Card] = takeFromDeck(5)
+  var deck: List[Card] = Nil
+  var hand: List[Card] = Nil
   var discard: List[Card] = Nil
+  
+  def init() {
+    deck = Random.shuffle(List(Estate, Estate, Estate, Copper, Copper, Copper, Copper, Copper, Copper, Copper))
+    drawToHand(5)
+  }
   
   def drawToHand(count: Int) {
     addToHand(takeFromDeck(count))
@@ -19,7 +24,7 @@ class Player(val name: String) {
   
   def addToHand(cards: List[Card]) {
     hand :::= cards
-    fireEvent(_.addedToHand(name, cards))
+    fireEventWithSpecial(this, _.addedToHand(name, cards), _.addedToHand(name, cards.map(_ => null)))
   }
   
   def addToDiscard(cards: List[Card]) {
@@ -29,13 +34,13 @@ class Player(val name: String) {
   
   def addToDeck(cards: List[Card]) {
     deck :::= cards
-    fireEvent(_.addedToDeck(name, cards))
+    fireEventWithSpecial(this, _.addedToDeck(name, cards), _.addedToDeck(name, cards.map(_ => null)))
   }
   
   def discardHand() {
     discard ++= hand
+    fireEvent(_.discardedHand(name, hand))
     hand = Nil
-    fireEvent(_.discardedHand(name, discard.size))
   }
   
   def shuffleDiscardIntoDeck() {
@@ -56,4 +61,12 @@ class Player(val name: String) {
       card :: takeFromDeck(count - 1)
     }
   }
+}
+
+object Player {
+  def get() = this
+  
+  val PILE_DECK = 0
+  val PILE_HAND = 1
+  val PILE_DISCARD = 2
 }

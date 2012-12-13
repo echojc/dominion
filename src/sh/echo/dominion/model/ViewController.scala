@@ -9,19 +9,18 @@ trait View {
   def turnEnded(p: String)
   def nextPlayer(p: String)
   def cardPlayed(p: String, c: Card)
-  def cardGained(p: String, c: Card)
-  def cardGainedToDeck(p: String, c: Card)
+  def cardGained(p: String, c: Card, to: Int)
   def cardTrashed(c: Card)
   def cardRevealed(c: Card)
   def revealCleared()
   def playedCardsCleared()
   def countsUpdated(action: Int, buy: Int, treasure: Int)
-  def selectedFromHand(p: String, count: Int)
+  def selectedFromHand(p: String, cards: java.util.List[Card])
   
   def addedToHand(p: String, cards: java.util.List[Card])
   def addedToDiscard(p: String, cards: java.util.List[Card])
   def addedToDeck(p: String, cards: java.util.List[Card])
-  def discardedHand(p: String, discardCount: Int)
+  def discardedHand(p: String, hand: java.util.List[Card])
   def shuffledDiscardIntoDeck(p: String, deckCount: Int)
   def tookCardFromDeck(p: String)
   
@@ -37,20 +36,20 @@ trait Controller {
   def createGame()
   def addPlayer(name: String, v: View): String
   def startGame(p: String)
-  def startTurn(p: String)
   def play(p: String, c: Card)
+  def buy(p: String, c: Card)
   def endTurn(p: String)
 }
 
-class ViewActor(val view: View) extends Actor {
-  type Callback[T] = View => T
-  def act() {
-    loop {
-      react {
-        case event: Callback[Unit] => event(view)
-        case event: Callback[_] => reply(event(view))
-        case _ => {}
-      }
-    }
-  }
-}
+//class ViewActor(val view: View) extends Actor {
+//  type Callback[T] = View => T
+//  def act() {
+//    loop {
+//      react {
+//        case event: Callback[Unit] => event(view)
+//        case event: Callback[_] => reply(event(view))
+//        case _ => {}
+//      }
+//    }
+//  }
+//}

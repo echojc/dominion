@@ -7,6 +7,7 @@ import sh.echo.dominion.model.cards.special._
 import sh.echo.dominion.model.cards.special.Silver
 import sh.echo.dominion.model.cards.special.Curse
 import sh.echo.dominion.model.cards.special.Copper
+import sh.echo.dominion.model.Player
 
 object Adventurer extends Action("Adventurer", 6, "Reveal cards from your deck until you reveal 2 Treasure cards. Put those Treasure cards into your hand and discard the other revealed cards.") {
   override def play() {
@@ -24,13 +25,15 @@ object Adventurer extends Action("Adventurer", 6, "Reveal cards from your deck u
 
 object Bureaucrat extends Action("Bureaucrat", 4, "Gain a Silver card; put it on top of your deck. Each other player reveals a Victory card from his hand and puts it on his deck (or reveals a hand with no Victory cards).") with Attack {
   override def play() {
-    gainToDeck(Silver)
+    gain(Silver, Player.PILE_DECK)
   }
   def attack() {
     cyclePlayers(_ => {
       if (currentPlayer.hand.exists(_.isInstanceOf[Victory])) {
         val card = selectFromHand(_.isInstanceOf[Victory], 1, true)
+        reveal(card)
         currentPlayer.addToDeck(card)
+        revealClear()
       } else {
         reveal(currentPlayer.hand)
         revealClear()
@@ -96,6 +99,7 @@ object Festival extends Action("Festival", 5, "+2 Actions, +1 Buy, +$2.") {
 object Gardens extends Victory("Gardens", 4) {
   override val description = "Worth 1vp for every 10 cards in your deck (rounded down)."
   override def value = Game.currentPlayer.deck.size / 10
+  override val sortPriority = actionSortPriority
 }
 
 object Laboratory extends Action("Laboratory", 5, "+2 Cards, +1 Action.") {
@@ -146,7 +150,7 @@ object Mine extends Action("Mine", 5, "Trash a Treasure card from your hand. Gai
     if (currentPlayer.hand.exists(_.isInstanceOf[Treasure])) {
       val card = selectFromHand(_.isInstanceOf[Treasure], 1)(0)
       trash(card)
-      selectAndGainFromSupply(c => c.isInstanceOf[Treasure] && c.cost <= card.cost + 3)
+      selectAndGainFromSupply(c => c.isInstanceOf[Treasure] && c.cost <= card.cost + 3, Player.PILE_HAND)
     }
   }
 }

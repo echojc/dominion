@@ -18,9 +18,7 @@ object Game extends Controller {
   def addPlayer(name: String, v: View): String = {
     val player = new Player(name)
     players ::= player
-    val actor = new ViewActor(v)
-    playerViews += player -> actor
-    actor.start()
+    playerViews += player -> v
     name
   }
   
@@ -31,19 +29,16 @@ object Game extends Controller {
     (CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).foreach(c => supply(c) = c.count)
     fireEvent(_.gameStarted(p, players.map(_.name), supply.keys.toList))
     
+    players.foreach(_.init())
     currentPlayerIndex = 0
     fireEvent(_.nextPlayer(currentPlayer.name))
-  }
-  
-  def startTurn(p: String) {
-    actionCount = 1
-    buyCount = 1
-    treasureCount = 0
-    fireEvent(_.countsUpdated(actionCount, buyCount, treasureCount))
-    fireEvent(_.turnStarted(p))
+    
+    startTurn();
   }
   
   def play(p: String, card: Card) {
+    if (p.toLowerCase() != currentPlayer.name.toLowerCase()) throw new IllegalArgumentException("Player is acting out of turn")
+    if (!playerCanPlayAction) throw new IllegalArgumentException("Cannot play any action cards!")
     if (!card.isPlayable) throw new IllegalArgumentException("Tried to play unplayable card.")
     if (!currentPlayer.hand.contains(card)) throw new IllegalArgumentException("Tried to play non-existent card.")
     if (card.isInstanceOf[Action]) {
@@ -53,12 +48,24 @@ object Game extends Controller {
     
     currentPlayer.hand = currentPlayer.hand diff List(card)
     playedCards ::= card
+    fireEvent(_.cardPlayed(currentPlayer.name, card))
     card.play()
-    fireEvent(_.cardPlayed(p, card))
+  }
+  
+  def buy(p: String, card: Card) {
+    if (p.toLowerCase() != currentPlayer.name.toLowerCase()) throw new IllegalArgumentException("Player is acting out of turn")
+    if (!supply.contains(card)) throw new IllegalArgumentException("Card is not in supply.")
+    if (supply(card) == 0) throw new IllegalArgumentException("No more copies of card to buy.")
+    
+    updateBuy(-1)
+    updateTreasure(-card.cost)
+    playerCanPlayAction = false
+    gain(card)
   }
   
   def endTurn(p: String) {
-    if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.");
+    if (p.toLowerCase() != currentPlayer.name.toLowerCase()) throw new IllegalArgumentException("Player is acting out of turn")
+    if (revealedCards != Nil) throw new IllegalStateException("Revealed cards were left revealed.")
     
     currentPlayer.discardHand()
     currentPlayer.addToDiscard(playedCards)
@@ -66,18 +73,20 @@ object Game extends Controller {
     fireEvent(_.playedCardsCleared())
     
     currentPlayer.drawToHand(5);
-    fireEvent(_.turnEnded(p))
+    fireEvent(_.turnEnded(currentPlayer.name))
     
     nextPlayer()
+    startTurn()
   }
 
   var actionCount = 1
   var buyCount = 1
   var treasureCount = 0
+  var playerCanPlayAction = true;
   
   def currentPlayer = players(currentPlayerIndex)
   var players: List[Player] = Nil
-  var playerViews: Map[Player, ViewActor] = Map()
+  var playerViews: Map[Player, View] = Map()
   var currentPlayerIndex = 0
   
   var playedCards: List[Card] = Nil
@@ -90,6 +99,15 @@ object Game extends Controller {
   def nextPlayer() {
     currentPlayerIndex = (currentPlayerIndex + 1) % players.size
     fireEvent(_.nextPlayer(currentPlayer.name))
+  }
+  
+  def startTurn() {
+    actionCount = 1
+    buyCount = 1
+    treasureCount = 0
+    playerCanPlayAction = true;
+    fireEvent(_.countsUpdated(actionCount, buyCount, treasureCount))
+    fireEvent(_.turnStarted(currentPlayer.name))
   }
   
   def reveal(card: Card) {
@@ -107,22 +125,18 @@ object Game extends Controller {
   }
   
   def gain(cards: List[Card]) {
-    cards.foreach(gain)
+    cards.foreach(c => gain(c))
   }
   
-  def gain(card: Card) {
+  def gain(card: Card, to: Int = Player.PILE_DISCARD) {
     if (supply(card) > 0) {
       supply(card) -= 1
-      currentPlayer.addToDiscard(List(card))
-      fireEvent(_.cardGained(currentPlayer.name, card))
-    }
-  }
-  
-  def gainToDeck(card: Card) {
-    if (supply(card) > 0) {
-      supply(card) -= 1
-      currentPlayer.addToDeck(List(card))
-      fireEvent(_.cardGainedToDeck(currentPlayer.name, card))
+      fireEvent(_.cardGained(currentPlayer.name, card, to))
+      to match {
+        case Player.PILE_DECK => currentPlayer.addToDeck(List(card))
+        case Player.PILE_DISCARD => currentPlayer.addToDiscard(List(card))
+        case Player.PILE_HAND => currentPlayer.addToHand(List(card))
+      }
     }
   }
   
@@ -143,7 +157,9 @@ object Game extends Controller {
     if (!(selected diff cards).isEmpty)
       throw new IllegalStateException("Invalid cards received.")
     currentPlayer.hand = currentPlayer.hand diff selected
-    fireEvent(_.selectedFromHand(currentPlayer.name, selected.size))
+    fireEventWithSpecial(currentPlayer,
+        _.selectedFromHand(currentPlayer.name, selected),
+        _.selectedFromHand(currentPlayer.name, selected.map(_ => null)))
     selected
   }
   
@@ -159,14 +175,14 @@ object Game extends Controller {
     selected
   }
   
-  def selectAndGainFromSupply(filter: Card => Boolean = _ => true) {
+  def selectAndGainFromSupply(filter: Card => Boolean = _ => true, to: Int = Player.PILE_DISCARD) {
     fireEvent(_.waitingFor(currentPlayer.name))
     val selected = fireEventForResult(currentPlayer, _.selectFromSupplyForGain(supply.keys.filter(filter).toList))
     fireEvent(_.waitedFor(currentPlayer.name))
     
     if (!filter(selected) || supply(selected) == 0)
       throw new IllegalStateException("Invalid card selected from supply for gain.")
-    gain(selected)
+    gain(selected, to)
   }
   
   def ask(msg: String, playerIndex: Int = currentPlayerIndex) : Boolean = {
@@ -211,10 +227,15 @@ object Game extends Controller {
   }
   
   def fireEvent(event: View => Unit) {
-    playerViews.values.foreach(_ ! event)
+    playerViews.values.foreach(event)
+  }
+  
+  def fireEventWithSpecial(player: Player, eventForPlayer: View => Unit, eventForOthers: View => Unit) {
+    eventForPlayer(playerViews(player))
+    playerViews.filterNot(_._1 == player).values.foreach(eventForOthers)
   }
   
   def fireEventForResult[T](p: Player, event: View => T): T = {
-    (playerViews(p) !? event).asInstanceOf[T]
+    event(playerViews(p))
   }
 }
