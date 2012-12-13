@@ -3,27 +3,30 @@ package sh.echo.dominion.model.cards.special
 import sh.echo.dominion.model.Game
 import sh.echo.dominion.model.cards._
 
-object Copper extends Treasure("Copper", 0, 1) {
+object Copper extends Card("Copper", 0) with Treasure {
+  override val value = 1
   override val count = 60 - (Game.players.size * 7)
 }
 
-object Silver extends Treasure("Silver", 3, 2) {
+object Silver extends Card("Silver", 3) with Treasure {
+  override val value = 2
   override val count = 40
 }
 
-object Gold extends Treasure("Gold", 6, 3) {
+object Gold extends Card("Gold", 6) with Treasure {
+  override val value = 3
   override val count = 30
 }
 
-object Estate extends Victory("Estate", 2) {
+object Estate extends Card("Estate", 2) with Victory {
   override val value = 1
 }
 
-object Duchy extends Victory("Duchy", 5) {
+object Duchy extends Card("Duchy", 5) with Victory {
   override val value = 3
 }
 
-object Province extends Victory("Province", 8) {
+object Province extends Card("Province", 8) with Victory {
   override val value = 6
   override val count = {
     val playerCount = Game.players.size
@@ -33,4 +36,6 @@ object Province extends Victory("Province", 8) {
   }
 }
 
-object Curse extends Curse("Curse", 0, -1)
+object Curse extends Card("Curse", 0) with Curse {
+  override val value = -1
+}

@@ -23,7 +23,7 @@ object Game extends Controller {
   }
   
   def startGame(p: String) {
-    Random.shuffle(players)
+    players = Random.shuffle(players)
     
     supply = Map()
     (CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).foreach(c => supply(c) = c.count)
@@ -50,16 +50,23 @@ object Game extends Controller {
     playedCards ::= card
     fireEvent(_.cardPlayed(currentPlayer.name, card))
     card.play()
+    
+    if (card.isInstanceOf[Attack]) {
+      card.asInstanceOf[Attack].attack()
+    }
   }
   
   def buy(p: String, card: Card) {
     if (p.toLowerCase() != currentPlayer.name.toLowerCase()) throw new IllegalArgumentException("Player is acting out of turn")
     if (!supply.contains(card)) throw new IllegalArgumentException("Card is not in supply.")
     if (supply(card) == 0) throw new IllegalArgumentException("No more copies of card to buy.")
+    if (buyCount == 0) throw new IllegalArgumentException("No more buys!")
+    if (treasureCount - card.cost < 0) throw new IllegalArgumentException("Cannot afford card!")
     
     updateBuy(-1)
     updateTreasure(-card.cost)
     playerCanPlayAction = false
+    fireEvent(_.cardBought(currentPlayer.name, card))
     gain(card)
   }
   
@@ -83,6 +90,7 @@ object Game extends Controller {
   var buyCount = 1
   var treasureCount = 0
   var playerCanPlayAction = true;
+  var playerTemporaryImmuneToAttack = false
   
   def currentPlayer = players(currentPlayerIndex)
   var players: List[Player] = Nil
@@ -105,14 +113,15 @@ object Game extends Controller {
     actionCount = 1
     buyCount = 1
     treasureCount = 0
-    playerCanPlayAction = true;
+    playerCanPlayAction = true
+    playerTemporaryImmuneToAttack = false
     fireEvent(_.countsUpdated(actionCount, buyCount, treasureCount))
     fireEvent(_.turnStarted(currentPlayer.name))
   }
   
   def reveal(card: Card) {
     revealedCards ::= card
-    fireEvent(_.cardRevealed(card))
+    fireEvent(_.cardRevealed(currentPlayer.name, card))
   }
   
   def reveal(cards: List[Card]) {
@@ -163,10 +172,10 @@ object Game extends Controller {
     selected
   }
   
-  def selectFromList(cards: List[Card], max: Int = -1, exact: Boolean = false): List[Card] = {
-    fireEvent(_.waitingFor(currentPlayer.name))
-    val selected = fireEventForResult(currentPlayer, _.selectFromList(cards, max, exact)).toList
-    fireEvent(_.waitedFor(currentPlayer.name))
+  def selectFromList(cards: List[Card], max: Int = -1, exact: Boolean = false, player: Player = currentPlayer): List[Card] = {
+    fireEvent(_.waitingFor(player.name))
+    val selected = fireEventForResult(player, _.selectFromList(cards, max, exact)).toList
+    fireEvent(_.waitedFor(player.name))
     
     if ((exact && selected.size != max) || (!exact && max != -1 && selected.size > max)) 
       throw new IllegalStateException("Incorrect number of cards received.")
@@ -195,7 +204,7 @@ object Game extends Controller {
   
   def trash(card: Card) {
     card :: trash
-    fireEvent(_.cardTrashed(card))
+    fireEvent(_.cardTrashed(currentPlayer.name, card))
   }
   
   def trash(cards: List[Card]) {
@@ -224,6 +233,28 @@ object Game extends Controller {
       actions(origPlayerIndex)
       nextPlayer()
     } while (currentPlayerIndex != origPlayerIndex)
+  }
+  
+  def attackPlayers(actions: Int => Unit, includeSelf: Boolean = false) {
+    cyclePlayers(origPlayerIndex => {
+      fireEvent(_.attackingPlayer(players(origPlayerIndex).name, currentPlayer.name))
+      
+      val validReactionCards = currentPlayer.hand.filter(c => c.isInstanceOf[Reaction] && c.asInstanceOf[Reaction].canReactTo(Reaction.Attack))
+      if (!validReactionCards.isEmpty) {
+        validReactionCards.foreach(c => {
+          val r = c.asInstanceOf[Reaction]
+          if (ask("Do you want to react with " + r.name + "?"))
+            fireEvent(_.reactionUsed(currentPlayer.name, r))
+            r.react(Reaction.Attack)
+        })
+      }
+      
+      if (playerTemporaryImmuneToAttack) {
+        playerTemporaryImmuneToAttack = false
+      } else {
+        actions(origPlayerIndex)
+      }
+    }, includeSelf)
   }
   
   def fireEvent(event: View => Unit) {

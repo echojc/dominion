@@ -2,6 +2,7 @@ package sh.echo.dominion.model
 
 import sh.echo.dominion.model.cards.Card
 import scala.actors.Actor
+import sh.echo.dominion.model.cards.Reaction
 
 trait View {
   def gameStarted(p: String, players: java.util.List[String], supply: java.util.List[Card])
@@ -10,12 +11,15 @@ trait View {
   def nextPlayer(p: String)
   def cardPlayed(p: String, c: Card)
   def cardGained(p: String, c: Card, to: Int)
-  def cardTrashed(c: Card)
-  def cardRevealed(c: Card)
+  def cardBought(p: String, c: Card)
+  def reactionUsed(p: String, c: Card)
+  def cardTrashed(p: String, c: Card)
+  def cardRevealed(p: String, c: Card)
   def revealCleared()
   def playedCardsCleared()
   def countsUpdated(action: Int, buy: Int, treasure: Int)
   def selectedFromHand(p: String, cards: java.util.List[Card])
+  def attackingPlayer(cur: String, target: String)
   
   def addedToHand(p: String, cards: java.util.List[Card])
   def addedToDiscard(p: String, cards: java.util.List[Card])
@@ -40,16 +44,3 @@ trait Controller {
   def buy(p: String, c: Card)
   def endTurn(p: String)
 }
-
-//class ViewActor(val view: View) extends Actor {
-//  type Callback[T] = View => T
-//  def act() {
-//    loop {
-//      react {
-//        case event: Callback[Unit] => event(view)
-//        case event: Callback[_] => reply(event(view))
-//        case _ => {}
-//      }
-//    }
-//  }
-//}
