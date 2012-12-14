@@ -25,8 +25,7 @@ object Game extends Controller {
   def startGame(p: String) {
     players = Random.shuffle(players)
     
-    supply = Map()
-    (CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).foreach(c => supply(c) = c.count)
+    supply = Map((CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).map(c => c -> c.count): _*)
     fireEvent(_.gameStarted(p, players.map(_.name), supply.keys.toList))
     
     players.foreach(_.init())
@@ -85,7 +84,7 @@ object Game extends Controller {
   var actionCount = 1
   var buyCount = 1
   var treasureCount = 0
-  var playerCanPlayAction = true;
+  var playerCanPlayAction = true
   var playerTemporaryImmuneToAttack = false
   
   def currentPlayer = players(currentPlayerIndex)
@@ -242,9 +241,10 @@ object Game extends Controller {
       if (!validReactionCards.isEmpty) {
         validReactionCards.foreach(c => {
           val r = c.asInstanceOf[Reaction]
-          if (ask("Do you want to react with " + r.name + "?"))
+          if (ask("Do you want to react with " + r.name + "?")) {
             fireEvent(_.reactionUsed(currentPlayer.name, r))
             r.react(Reaction.Attack)
+          }
         })
       }
       
