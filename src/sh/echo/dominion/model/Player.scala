@@ -57,7 +57,7 @@ class Player(val name: String) {
       if (deck == Nil) Nil
       val card = deck.head
       deck = deck.tail
-      fireEvent(_.tookCardFromDeck(name))
+      fireEventWithSpecial(this, _.tookCardFromDeck(name, card), _.tookCardFromDeck(name, null))
       card :: takeFromDeck(count - 1)
     }
   }

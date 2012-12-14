@@ -18,7 +18,7 @@ trait View {
   def revealCleared()
   def playedCardsCleared()
   def countsUpdated(action: Int, buy: Int, treasure: Int)
-  def selectedFromHand(p: String, cards: java.util.List[Card])
+  def selectedFromHand(p: String, cards: java.util.List[Card], remove: Boolean)
   def attackingPlayer(cur: String, target: String)
   
   def addedToHand(p: String, cards: java.util.List[Card])
@@ -26,7 +26,7 @@ trait View {
   def addedToDeck(p: String, cards: java.util.List[Card])
   def discardedHand(p: String, hand: java.util.List[Card])
   def shuffledDiscardIntoDeck(p: String, deckCount: Int)
-  def tookCardFromDeck(p: String)
+  def tookCardFromDeck(p: String, c: Card)
   
   def waitingFor(p: String)
   def waitedFor(p: String)

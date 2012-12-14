@@ -50,10 +50,6 @@ object Game extends Controller {
     playedCards ::= card
     fireEvent(_.cardPlayed(currentPlayer.name, card))
     card.play()
-    
-    if (card.isInstanceOf[Attack]) {
-      card.asInstanceOf[Attack].attack()
-    }
   }
   
   def buy(p: String, card: Card) {
@@ -149,7 +145,8 @@ object Game extends Controller {
     }
   }
   
-  def selectFromHand(filter: Card => Boolean = _ => true, max: Int = -1, exact: Boolean = false, auto: Boolean = false): List[Card] = {
+  def selectFromHand(filter: Card => Boolean = _ => true, max: Int = -1, exact: Boolean = false, 
+      auto: Boolean = false, remove: Boolean = true): List[Card] = {
     val cards = currentPlayer.hand.filter(filter)
     var selected: List[Card] = null
     if (auto) {
@@ -165,10 +162,12 @@ object Game extends Controller {
       throw new IllegalStateException("Incorrect number of cards received.")
     if (!(selected diff cards).isEmpty)
       throw new IllegalStateException("Invalid cards received.")
-    currentPlayer.hand = currentPlayer.hand diff selected
+    if (remove) {
+      currentPlayer.hand = currentPlayer.hand diff selected
+    }
     fireEventWithSpecial(currentPlayer,
-        _.selectedFromHand(currentPlayer.name, selected),
-        _.selectedFromHand(currentPlayer.name, selected.map(_ => null)))
+        _.selectedFromHand(currentPlayer.name, selected, remove),
+        _.selectedFromHand(currentPlayer.name, selected.map(_ => null), remove))
     selected
   }
   

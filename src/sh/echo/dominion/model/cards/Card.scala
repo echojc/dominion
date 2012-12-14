@@ -36,7 +36,7 @@ trait Action extends Card {
 }
 
 trait Attack extends Card {
-  def attack()
+  
 }
 
 trait Reaction extends Card {

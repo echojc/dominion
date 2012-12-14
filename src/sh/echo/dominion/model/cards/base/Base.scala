@@ -28,8 +28,6 @@ object Bureaucrat extends Card("Bureaucrat", 4) with Action with Attack {
   override val description = "Gain a Silver card; put it on top of your deck. Each other player reveals a Victory card from his hand and puts it on his deck (or reveals a hand with no Victory cards)."
   override def play() {
     gain(Silver, Player.PILE_DECK)
-  }
-  def attack() {
     attackPlayers(_ => {
       if (currentPlayer.hand.exists(_.isInstanceOf[Victory])) {
         val card = selectFromHand(_.isInstanceOf[Victory], 1, true)
@@ -146,8 +144,6 @@ object Militia extends Card("Militia", 4) with Action with Attack {
   override val description = "+$2. Each other player discards down to 3 cards in his hand."
   override def play() {
     updateTreasure(2)
-  }
-  def attack() {
     attackPlayers(_ => {
       if (currentPlayer.hand.size > 3) {
         val cards = selectFromHand(max = currentPlayer.hand.size - 3, exact = true)
@@ -218,8 +214,6 @@ object Spy extends Card("Spy", 4) with Action with Attack {
   override def play() {
     currentPlayer.drawToHand(1)
     updateAction(1)
-  }
-  def attack() {
     attackPlayers(origPlayerIndex => {
       val card = currentPlayer.takeFromDeck(1)
       reveal(card)
@@ -235,8 +229,7 @@ object Spy extends Card("Spy", 4) with Action with Attack {
 
 object Thief extends Card("Thief", 4) with Action with Attack {
   override val description = "Each other player reveals the top 2 cards of his deck. If they revealed any Treasure cards, they trash one of them that you choose. You may gain any or all of these trashed cards. They discard the other revealed cards."
-  override def play() {}
-  def attack() {
+  override def play() {
     var trashedCards: List[Card] = Nil
     attackPlayers(origPlayerIndex => {
       val cards = currentPlayer.takeFromDeck(2)
@@ -265,7 +258,9 @@ object ThroneRoom extends Card("Throne Room", 4) with Action {
   override val description = "Choose an Action card in your hand. Play it twice."
   override def play() {
     if (currentPlayer.hand.count { _.isInstanceOf[Action] } > 0) {
-      val card = selectFromHand(_.isInstanceOf[Action], 1, true)(0)
+      val card = selectFromHand(_.isInstanceOf[Action], 1, true, remove = false)(0)
+      // HACK ninja increase action count
+      actionCount += 1
       Game.play(currentPlayer.name, card)
       card.play()
     }
@@ -284,8 +279,6 @@ object Witch extends Card("Witch", 5) with Action with Attack {
   override val description = "+2 Cards. Each other player gains a Curse card."
   override def play() {
     currentPlayer.drawToHand(2)
-  }
-  def attack() {
     attackPlayers(_ => {
       gain(Curse)
     })
