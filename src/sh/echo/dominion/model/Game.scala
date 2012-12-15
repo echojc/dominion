@@ -4,6 +4,8 @@ import sh.echo.dominion.model.cards._
 import scala.util.Random
 import scala.collection.JavaConversions._
 import scala.collection.mutable.Map
+import sh.echo.dominion.model.cards.base.Thief
+import sh.echo.dominion.model.cards.base.Feast
 
 object Game extends Controller {
   def get() = this
@@ -26,6 +28,8 @@ object Game extends Controller {
     players = Random.shuffle(players)
     
     supply = Map((CardLists.Special ++ Random.shuffle(CardLists.Base).take(10)).map(c => c -> c.count): _*)
+    supply(Thief) = Thief.count
+    supply(Feast) = Feast.count
     fireEvent(_.gameStarted(p, players.map(_.name), supply.keys.toList))
     
     players.foreach(_.init())
@@ -114,6 +118,15 @@ object Game extends Controller {
     fireEvent(_.turnStarted(currentPlayer.name))
   }
   
+  def removeFromPlayed(card: Card) {
+    removeFromPlayed(List(card))
+  }
+  
+  def removeFromPlayed(cards: List[Card]) {
+    fireEvent(_.removedFromPlayedCards(cards))
+    playedCards = playedCards diff cards
+  }
+  
   def reveal(card: Card) {
     revealedCards ::= card
     fireEvent(_.cardRevealed(currentPlayer.name, card))
@@ -121,6 +134,15 @@ object Game extends Controller {
   
   def reveal(cards: List[Card]) {
     cards.foreach(reveal)
+  }
+  
+  def removeFromRevealed(card: Card) {
+    removeFromRevealed(List(card))
+  }
+  
+  def removeFromRevealed(cards: List[Card]) {
+    revealedCards = revealedCards diff cards
+    fireEvent(_.removedFromRevealed(cards))
   }
   
   def revealClear() {

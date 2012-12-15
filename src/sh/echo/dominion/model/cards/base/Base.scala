@@ -86,7 +86,7 @@ object Feast extends Card("Feast", 4) with Action {
   override val description = "Trash this card. Gain a card costing up to $5."
   override def play() {
     if (playedCards.head == Feast) {
-      playedCards = playedCards.tail
+      removeFromPlayed(Feast)
       trash(Feast)
     }
     selectAndGainFromSupply(_.cost <= 5)
@@ -241,7 +241,7 @@ object Thief extends Card("Thief", 4) with Action with Attack {
           else selectFromList(revealedCards, 1, true, players(origPlayerIndex))
         )(0)
         trashedCards ::= card
-        revealedCards diff List(card)
+        removeFromRevealed(card)
         trash(card)
       }
       currentPlayer.addToDiscard(revealedCards)
